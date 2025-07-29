@@ -1,0 +1,102 @@
+{
+	"info": {
+		"_postman_id": "4ca7f6e7-01a5-469d-8931-234327693a07",
+		"name": "New Collection",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "27821148"
+	},
+	"item": [
+		{
+			"name": "send-email",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"const TP = pm.environment.get(\"transactionId\");\r",
+							"const variants = [\r",
+							"  TP,\r",
+							"  `${TP},OTHER123`,\r",
+							"  [TP, 'OTHER123'],\r",
+							"  -1,\r",
+							"  \"-1\",\r",
+							"  `${TP}%00`\r",
+							"];\r",
+							"const idx = parseInt(pm.iterationData.get(\"index\") || 0, 10);\r",
+							"pm.environment.set(\"tid_variant\", JSON.stringify(variants[idx]));\r",
+							"console.log(\"tid_variant set to:\", pm.environment.get(\"tid_variant\"));\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Basic HTTP status code check\r",
+							"pm.test(\"Status code is 200 or appropriate error\", () => {\r",
+							"  pm.expect(pm.response.code).to.be.oneOf([200, 400, 401, 403]);\r",
+							"});\r",
+							"\r",
+							"// Parse JSON response\r",
+							"let jsonData;\r",
+							"try {\r",
+							"  jsonData = pm.response.json();\r",
+							"} catch (error) {\r",
+							"  pm.test(\"Response is valid JSON\", () => {\r",
+							"    pm.expect.fail(\"Response is not valid JSON\");\r",
+							"  });\r",
+							"}\r",
+							"\r",
+							"// Assert tid_variant works: Should not return unauthorized IDs\r",
+							"pm.test(\"transactionId in response should not contain unauthorized variant\", () => {\r",
+							"  const responseTid = jsonData.data?.referenceID || jsonData.data?.uniqueIdentifier;\r",
+							"  const variant = pm.environment.get(\"tid_variant\");\r",
+							"  if (responseTid && variant) {\r",
+							"    pm.expect(responseTid).to.not.include(\"OTHER123\");\r",
+							"  }\r",
+							"});\r",
+							"\r",
+							"// Optional: Check that narration doesn’t echo attack payload verbatim\r",
+							"pm.test(\"narration should not reflect raw tid variant input\", () => {\r",
+							"  const narration = jsonData.data?.narration;\r",
+							"  const variant = pm.environment.get(\"tid_variant\");\r",
+							"  if (narration && variant) {\r",
+							"    pm.expect(narration).to.not.include(variant.replace(/[\"\\[\\]]/g, \"\"));\r",
+							"  }\r",
+							"});\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"to\": \"user@example.com\",\r\n  \"subject\": \"{{injection_payload}}\",\r\n  \"body\": \"Thanks for signing up.\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/send-email",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"send-email"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
